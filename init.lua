@@ -4,7 +4,8 @@ vim.opt.number = true
 vim.o.expandtab = true      -- Use spaces instead of tabs
 vim.o.shiftwidth = 2        -- Indent by 2 spaces
 vim.o.tabstop = 2           -- A tab is shown as 2 spaces
--- vim.opt.smartindent = true          -- Enable smart indentation
+vim.opt.smartindent = true          -- Enable smart indentation
+vim.opt.autoindent = true          -- Enable smart indentation
 vim.opt.termguicolors = true        -- Enable true colors
 vim.opt.wrap = true -- Enable line wrapping
 vim.opt.clipboard = "unnamedplus"   -- Use system clipboard
@@ -78,19 +79,28 @@ require("lazy").setup({
   { "nvim-tree/nvim-tree.lua", dependencies = { "nvim-tree/nvim-web-devicons" },},
   { "nvim-lualine/lualine.nvim" }, -- Status line
   { "tpope/vim-commentary" }, -- Comment toggle
-  {
-    "williamboman/mason.nvim",
-    config = true
-  },
-  {
-    "williamboman/mason-lspconfig.nvim",
-    dependencies = { "williamboman/mason.nvim" },
-    config = true
-  },
+  -- {
+  --   "williamboman/mason.nvim",
+  --   config = true
+  -- },
+  -- {
+  --   "williamboman/mason-lspconfig.nvim",
+  --   dependencies = { "williamboman/mason.nvim" },
+  --   config = true
+  -- },
   {
     "neovim/nvim-lspconfig"
   },
-  { "hrsh7th/nvim-cmp", dependencies = { "hrsh7th/cmp-nvim-lsp" } }, -- Autocomplete
+  { 
+    "hrsh7th/nvim-cmp", 
+    dependencies = { 
+      "hrsh7th/cmp-nvim-lsp",
+      "hrsh7th/cmp-buffer",
+      "hrsh7th/cmp-path",
+      "hrsh7th/cmp-cmdline",
+      "saadparwaiz1/cmp_luasnip"
+    } 
+  }, -- Autocomplete
   { "L3MON4D3/LuaSnip" }, -- Snippet support
   {
   "akinsho/toggleterm.nvim",
@@ -133,8 +143,8 @@ require("lazy").setup({
           delay = 1000, -- ms delay before blame appears
           virt_text_pos = "eol", -- show at end of line
         },
-    })
-  end,
+      })
+    end,
   },
   {
     "akinsho/flutter-tools.nvim",
@@ -155,7 +165,51 @@ require("lazy").setup({
   },
   {
     "github/copilot.vim",
-    event = "InsertEnter"
+    lazy = false, 
+    priority = 1000,
+    config = function()
+      -- Disable default Tab mapping for Copilot to avoid conflicts with nvim-cmp
+      vim.g.copilot_no_tab_map = true
+      
+      -- Set Ctrl+F to accept Copilot suggestions
+      vim.keymap.set("i", "<C-f>", 'copilot#Accept("<CR>")', {
+        expr = true,
+        replace_keycodes = false,
+        silent = true,
+        desc = "Accept Copilot suggestion"
+      })
+      
+      -- Optional: Add Ctrl+] to dismiss Copilot suggestion
+      vim.keymap.set("i", "<C-]>", "<Plug>(copilot-dismiss)", {
+        silent = true,
+        desc = "Dismiss Copilot suggestion"
+      })
+      
+      -- Optional: Add Ctrl+Right/Left to navigate through suggestions
+      vim.keymap.set("i", "<C-Right>", "<Plug>(copilot-next)", {
+        silent = true,
+        desc = "Next Copilot suggestion"
+      })
+      vim.keymap.set("i", "<C-Left>", "<Plug>(copilot-previous)", {
+        silent = true,
+        desc = "Previous Copilot suggestion"
+      })
+    end,
+  },
+  {"goolord/alpha-nvim",
+    dependencies = { "nvim-tree/nvim-web-devicons" },
+    config = setup_alpha_dashboard,  
+  },
+  {
+    "folke/which-key.nvim",
+    event = "VeryLazy",
+    config = function()
+      require("which-key").setup({
+        -- your configuration comes here
+        -- or leave it empty to use the default settings
+        -- refer to the configuration section below
+      })
+    end,
   }
 })
 
@@ -203,28 +257,64 @@ vim.keymap.set("n", "<leader>gp", function()
 end, { desc = "preview git hunk diff" })
 
 -- LSP Configuration
-require("mason").setup()
-require("mason-lspconfig").setup({
-  ensure_installed = { "pyright", "clangd", "ts_ls"},
-  automatic_installation = true,
+-- require("mason-lspconfig").setup {
+--     ensure_installed = { "pyright", "clangd" },
+-- }
+
+-- Python LSP Setup with pyright
+local lspconfig = require("lspconfig")
+
+-- Configure pyright for Python
+lspconfig.pyright.setup({
+  capabilities = require("cmp_nvim_lsp").default_capabilities(),
+  settings = {
+    python = {
+      analysis = {
+        autoSearchPaths = true,
+        useLibraryCodeForTypes = true,
+        diagnosticMode = "workspace"
+      }
+    }
+  }
 })
 
-local lspconfig = require("lspconfig")
-local servers = { "ts_ls", "pyright", "clangd", "dartls" }
-
-for _, server in ipairs(servers) do
-  lspconfig[server].setup({})
-end
+-- LSP keybindings
+vim.api.nvim_create_autocmd("LspAttach", {
+  group = vim.api.nvim_create_augroup("UserLspConfig", {}),
+  callback = function(ev)
+    local opts = { buffer = ev.buf }
+    vim.keymap.set("n", "gD", vim.lsp.buf.declaration, opts)
+    vim.keymap.set("n", "gd", vim.lsp.buf.definition, opts)
+    vim.keymap.set("n", "K", vim.lsp.buf.hover, opts)
+    vim.keymap.set("n", "gi", vim.lsp.buf.implementation, opts)
+    vim.keymap.set("n", "<C-k>", vim.lsp.buf.signature_help, opts)
+    vim.keymap.set("n", "<leader>ca", vim.lsp.buf.code_action, opts)
+  end,
+})
 
 -- Autocomplete Configuration
 local cmp = require("cmp")
+local luasnip = require("luasnip")
+
 cmp.setup({
+  snippet = {
+    expand = function(args)
+      luasnip.lsp_expand(args.body)
+    end,
+  },
   mapping = {
     ["<Tab>"] = cmp.mapping.select_next_item(),
     ["<S-Tab>"] = cmp.mapping.select_prev_item(),
     ["<CR>"] = cmp.mapping.confirm({ select = true }),
+    ["<C-Space>"] = cmp.mapping.complete(),
   },
-  sources = { { name = "nvim_lsp" } },
+  sources = cmp.config.sources({
+    { name = "nvim_lsp" },
+    { name = "luasnip" },
+  }, {
+    { name = "buffer" },
+    { name = "path" },
+  }),
 })
 
 -- nvim-tree setup
@@ -265,3 +355,24 @@ vim.api.nvim_create_autocmd("BufEnter", {
     end)
   end,
 })
+
+local function setup_alpha_dashboard()
+  local alpha = require("alpha")
+  local dashboard = require("alpha.themes.dashboard")
+
+  dashboard.section.header.val = {
+    "🧠 Neovim Dashboard",
+    "🚀 Ready to code",
+  }
+
+  dashboard.section.buttons.val = {
+    dashboard.button("f", "🔍  Find file", ":Telescope find_files<CR>"),
+    dashboard.button("n", "📄  New file", ":ene <BAR> startinsert<CR>"),
+    dashboard.button("r", "🕘  Recent files", ":Telescope oldfiles<CR>"),
+    dashboard.button("q", "❌  Quit", ":qa<CR>"),
+  }
+
+  alpha.setup(dashboard.config)
+end
+
+require("colorscheme")
