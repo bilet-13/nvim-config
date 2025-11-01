@@ -243,6 +243,8 @@ vim.keymap.set("n", "<leader>d", ":Telescope lsp_definitions<CR>", { silent = tr
 vim.keymap.set("n", "<leader>rn", vim.lsp.buf.rename, { desc = "LSP Rename" })
 vim.keymap.set('n', '<leader>o', ':NvimTreeToggle<CR>', { silent = true })
 vim.keymap.set("n", "<leader>fo", ":FlutterOutlineToggle<CR>", { silent = true, desc = "Toggle Flutter Outline" })
+-- local tb = require("telescope.builtin")
+-- vim.keymap.set("n", "<leader>ci", tb.lsp_incoming_calls, { silent = true, desc = "Callers (incoming calls)" })
 
 vim.keymap.set("n", "<leader>gb", function()
   require("gitsigns").blame_line({ full = true })
@@ -278,6 +280,14 @@ lspconfig.pyright.setup({
   }
 })
 
+-- Auto format Python files on save
+vim.api.nvim_create_autocmd("BufWritePre", {
+  pattern = "*.py",
+  callback = function()
+    vim.lsp.buf.format({ async = false })
+  end,
+})
+
 -- LSP keybindings
 vim.api.nvim_create_autocmd("LspAttach", {
   group = vim.api.nvim_create_augroup("UserLspConfig", {}),
@@ -303,9 +313,9 @@ cmp.setup({
     end,
   },
   mapping = {
-    ["<Tab>"] = cmp.mapping.select_next_item(),
-    ["<S-Tab>"] = cmp.mapping.select_prev_item(),
-    ["<CR>"] = cmp.mapping.confirm({ select = true }),
+    ["<Down>"] = cmp.mapping.select_next_item(),
+    ["<Up>"] = cmp.mapping.select_prev_item(),
+    ["<Tab>"] = cmp.mapping.confirm({ select = true }),
     ["<C-Space>"] = cmp.mapping.complete(),
   },
   sources = cmp.config.sources({
